@@ -1,14 +1,22 @@
-# Use OpenJDK base image
-FROM openjdk:21-jdk-slim
+# Use Java 21 JRE (compatible with your pom.xml: <java.version>21</java.version>)
+FROM eclipse-temurin:21-jre-alpine
 
-# Set working directory
+# Set working directory inside the container
 WORKDIR /app
 
-# Copy jar file to container
-COPY target/SpringBoot_DemoProject-0.0.1-SNAPSHOT.jar app.jar
+# The JAR will be created by Jenkins with:
+# mvn -B clean package  -> target/<something>.jar
+ARG JAR_FILE=target/*.jar
 
-# Expose port (update if needed)
-EXPOSE 8080
+# Copy the built Spring Boot fat JAR into the container
+COPY ${JAR_FILE} app.jar
 
-# Run the application
+# Optional: set Spring profile (adjust if you use profiles)
+# ENV SPRING_PROFILES_ACTIVE=prod
+
+# Spring Boot default port
+EXPOSE 8081
+
+# Run the Spring Boot app
 ENTRYPOINT ["java", "-jar", "app.jar"]
+

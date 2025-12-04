@@ -1,73 +1,118 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    APP_NAME = "user-app"
-    IMAGE = "user-app:${env.BUILD_NUMBER}"
-    JAR_GLOB = "target/*.jar"
-    HOST_PORT = "8081"   // app will be exposed on host:8081 to avoid conflict with Jenkins:8080
-  }
+    environment {
+        // ======= CHANGE THESE FOR YOUR PROJECT =======
+        // Docker Hub image name: <your-dockerhub-username>/<repo-name>
+        IMAGE_NAME = "sairamk5/my-userapp"
 
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
+        // Tag image with Jenkins build number (or use GIT_COMMIT if you prefer)
+        IMAGE_TAG  = "${env.BUILD_NUMBER}"
+
+        // Jenkins credentials:
+        // 1) Docker Hub username/password as "Username with password"
+        DOCKERHUB_CREDENTIALS_ID = "dockerhub-cred-id"
+
+        // 2) kubeconfig file for your Kubernetes cluster as "Secret file"
+        KUBECONFIG_CREDENTIALS_ID = "kubeconfig-cred-id"
+
+        // Kubernetes details
+        K8S_NAMESPACE = "default"
+        K8S_DEPLOYMENT = "userapp-deployment"   // kubectl get deploy -n <ns>
+        K8S_CONTAINER  = "userapp-container"    // container name inside that deployment
     }
 
-    stage('Build & Test') {
-      steps {
-        // ensure executable
-        sh 'chmod +x mvnw || true'
-        sh './mvnw -B clean package'
-      }
-      post {
-        always {
-          junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+    options {
+        // Keep console output shorter
+        timestamps()
+    }
+
+    stages {
+
+        stage('Checkout from Git') {
+            steps {
+                // If this is a "Pipeline script from SCM" job or Multibranch Pipeline,
+                // Jenkins already knows the Git repo; this will clone it:
+                checkout scm
+
+                // If you want to hardcode Git instead, comment the above and use:
+                // git branch: 'main', url: 'https://github.com/Sairam-K5/User-App-Project.git'
+            }
         }
-      }
-    }
 
-    stage('Archive') {
-      steps {
-        archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-      }
-    }
-
-    stage('Docker Build & Deploy (if docker)') {
-      steps {
-        script {
-          def jarExists = sh(script: "ls ${JAR_GLOB} 2>/dev/null || true", returnStdout: true).trim()
-          if (!jarExists) {
-            error "Jar not found in target/ — build failed or produced different output."
-          }
-
-          // If docker is present, build image + run container (host:8081 -> container:8080)
-          def dockerAvailable = sh(script: 'which docker >/dev/null 2>&1 && echo "yes" || echo "no"', returnStdout: true).trim()
-          if (dockerAvailable == 'yes') {
-            sh "docker build -t ${IMAGE} ."
-            // stop & remove previous container if present
-            sh "docker rm -f ${APP_NAME} || true"
-            // run in detached mode; map host port 8081 -> container 8080 (Spring default)
-            sh "docker run -d --name ${APP_NAME} -p ${HOST_PORT}:8080 ${IMAGE}"
-            echo "App container started and mapped to http://localhost:${HOST_PORT}"
-          } else {
-            // fallback: run jar directly in background (will use server.port=8081)
-            sh "pkill -f '${APP_NAME}' || true || true"
-            sh "nohup java -jar ${JAR_GLOB} --server.port=${HOST_PORT} > ${APP_NAME}.log 2>&1 &"
-            echo "App started via java -jar and reachable at http://localhost:${HOST_PORT}"
-          }
+        stage('Build & Test (Maven)') {
+            steps {
+                sh '''
+                    echo "Building Java project with Maven..."
+                    mvn -B clean package
+                    echo "Maven build + tests completed."
+                '''
+            }
         }
-      }
-    }
-  }
 
-  post {
-    always {
-      echo "Pipeline finished. Check build logs / archived artifacts."
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "Building Docker image ${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh """
+                        docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: DOCKERHUB_CREDENTIALS_ID,
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh '''
+                            echo "Logging in to Docker Hub..."
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        '''
+                    }
+
+                    sh """
+                        echo "Pushing image to Docker Hub..."
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+
+                        echo "Tagging and pushing 'latest'..."
+                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+                        docker push ${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes with kubectl') {
+            steps {
+                script {
+                    // Use the kubeconfig file stored as a Jenkins secret file
+                    withCredentials([file(credentialsId: KUBECONFIG_CREDENTIALS_ID, variable: 'KUBECONFIG_FILE')]) {
+                        sh '''
+                            export KUBECONFIG="$KUBECONFIG_FILE"
+
+                            echo "Updating deployment image in Kubernetes..."
+                            kubectl set image deployment/${K8S_DEPLOYMENT} ${K8S_CONTAINER}=${IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
+
+                            echo "Waiting for rollout to finish..."
+                            kubectl rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}
+                        '''
+                    }
+                }
+            }
+        }
     }
-    failure {
-      subject: "Build failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}", body: "See Jenkins job for details." // optional
+
+    post {
+        success {
+            echo "✅ Build & deployment successful! Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+        }
+        failure {
+            echo "❌ Build or deployment failed. Check the logs above."
+        }
     }
-  }
 }

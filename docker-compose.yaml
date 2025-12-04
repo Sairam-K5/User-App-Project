@@ -1,19 +1,24 @@
-version: "3.8"
+version: "3.9"
+
 services:
   mysql:
-    image: mysql:8
-    container_name: mysql-container
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: admin
-      MYSQL_DATABASE: testdb
+      MYSQL_ROOT_PASSWORD: admin          # same as SPRING_DATASOURCE_PASSWORD
+      MYSQL_DATABASE: testdb              # same as in SPRING_DATASOURCE_URL
     ports:
-      - "3307:3306"   # Access MySQL at localhost:3307
-    networks:
-      - app-network
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
 
-  app:
+  backend:
+    # Option 1: build image from your Dockerfile locally
     build: .
-    container_name: user-application
+    image: sairamk5/my-userapp              # same image name you use in k8s & Jenkins
+    container_name: backend
+    restart: always
     depends_on:
       - mysql
     environment:
@@ -21,10 +26,8 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: admin
     ports:
-      - "8081:8080"   # Access app at localhost:8081
-    networks:
-      - app-network
+      - "8081:8080"
 
-networks:
-  app-network:
-    driver: bridge
+volumes:
+  mysql-data:
+
