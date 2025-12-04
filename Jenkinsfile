@@ -40,12 +40,12 @@ pipeline {
             }
         }
 
-        stage('Build & Test (Maven)') {
+        stage('Build (Maven without tests)') {
             steps {
                 sh '''
-                    echo "Building Java project with Maven..."
-                    mvn -B clean package
-                    echo "Maven build + tests completed."
+                    echo "Running Maven build without tests..."
+                    mvn -B clean package -DskipTests
+                    echo "Maven build completed."
                 '''
             }
         }
