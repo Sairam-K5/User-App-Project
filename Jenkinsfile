@@ -14,7 +14,7 @@ pipeline {
         DOCKERHUB_CREDENTIALS_ID = "dockerhub-cred-id"
 
         // 2) kubeconfig file for your Kubernetes cluster as "Secret file"
-        KUBECONFIG_CREDENTIALS_ID = "kubeconfig-cred-id"
+        KUBECONFIG_CREDENTIALS_ID = "minikube-kubeconfig"
 
         // Kubernetes details
         K8S_NAMESPACE = "default"
@@ -90,16 +90,19 @@ pipeline {
         stage('Deploy to Kubernetes with kubectl') {
             steps {
                 script {
-                    // Use the kubeconfig file stored as a Jenkins secret file
                     withCredentials([file(credentialsId: KUBECONFIG_CREDENTIALS_ID, variable: 'KUBECONFIG_FILE')]) {
-                        sh '''
-                            export KUBECONFIG="$KUBECONFIG_FILE"
+                sh '''
+                    echo "Using kubeconfig file: $KUBECONFIG_FILE"
+                    export KUBECONFIG="$KUBECONFIG_FILE"
 
-                            echo "Updating deployment image in Kubernetes..."
-                            kubectl set image deployment/${K8S_DEPLOYMENT} ${K8S_CONTAINER}=${IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
+                    echo "Checking cluster access..."
+                    kubectl --kubeconfig="$KUBECONFIG_FILE" get nodes
 
-                            echo "Waiting for rollout to finish..."
-                            kubectl rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}
+                    echo "Updating deployment image in Kubernetes..."
+                    kubectl --kubeconfig="$KUBECONFIG_FILE" set image deployment/${K8S_DEPLOYMENT} ${K8S_CONTAINER}=${IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
+
+                    echo "Waiting for rollout to complete..."
+                    kubectl --kubeconfig="$KUBECONFIG_FILE" rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}
                         '''
                     }
                 }
