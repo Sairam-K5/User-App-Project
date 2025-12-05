@@ -88,27 +88,28 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes with kubectl') {
-            steps {
-                script {
-                    withCredentials([file(credentialsId: KUBECONFIG_CREDENTIALS_ID, variable: 'KUBECONFIG_FILE')]) {
-                sh '''
+    steps {
+        script {
+            withCredentials([file(credentialsId: KUBECONFIG_CREDENTIALS_ID, variable: 'KUBECONFIG_FILE')]) {
+                sh """
                     echo "Using kubeconfig file: $KUBECONFIG_FILE"
                     export KUBECONFIG="$KUBECONFIG_FILE"
 
                     echo "Checking cluster access..."
-                    kubectl --kubeconfig="$KUBECONFIG_FILE" get nodes
+                    kubectl get nodes
 
                     echo "Updating deployment image in Kubernetes..."
-                    kubectl --kubeconfig="$KUBECONFIG_FILE" set image deployment/${K8S_DEPLOYMENT} ${K8S_CONTAINER}=${IMAGE_NAME}:${IMAGE_TAG} -n dev
+                    kubectl set image deployment/${K8S_DEPLOYMENT} ${K8S_CONTAINER}=${IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
 
                     echo "Waiting for rollout to complete..."
-                    kubectl --kubeconfig="$KUBECONFIG_FILE" rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}
-                        '''
-                    }
-                }
+                    kubectl rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}
+                """
             }
         }
     }
+}
+
+}
 
     post {
         success {
