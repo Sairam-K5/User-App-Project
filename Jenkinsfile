@@ -99,7 +99,7 @@ pipeline {
                     kubectl --kubeconfig="$KUBECONFIG_FILE" get nodes
 
                     echo "Updating deployment image in Kubernetes..."
-                    kubectl --kubeconfig="$KUBECONFIG_FILE" set image deployment/${K8S_DEPLOYMENT} ${K8S_CONTAINER}=${IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
+                    kubectl --kubeconfig="$KUBECONFIG_FILE" set image deployment/${K8S_DEPLOYMENT} ${K8S_CONTAINER}=${IMAGE_NAME}:${IMAGE_TAG} -n dev
 
                     echo "Waiting for rollout to complete..."
                     kubectl --kubeconfig="$KUBECONFIG_FILE" rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}
