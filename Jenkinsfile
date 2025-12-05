@@ -14,10 +14,9 @@ pipeline {
         DOCKERHUB_CREDENTIALS_ID = "dockerhub-cred-id"
 
         // 2) kubeconfig file for your Kubernetes cluster as "Secret file"
-        KUBECONFIG_CREDENTIALS_ID = "minikube-kubeconfig"
+        KUBECONFIG_CREDENTIALS_ID = "jenkins-kubeconfig"
 
         // Kubernetes details
-        KUBECONFIG_CREDENTIALS_ID = "jenkins-kubeconfig"
         K8S_NAMESPACE = "default"
         K8S_DEPLOYMENT = "userapp-deployment"   // kubectl get deploy -n <ns>
         K8S_CONTAINER  = "userapp-container"    // container name inside that deployment
