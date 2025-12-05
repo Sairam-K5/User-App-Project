@@ -17,6 +17,7 @@ pipeline {
         KUBECONFIG_CREDENTIALS_ID = "minikube-kubeconfig"
 
         // Kubernetes details
+        KUBECONFIG_CREDENTIALS_ID = "jenkins-kubeconfig"
         K8S_NAMESPACE = "default"
         K8S_DEPLOYMENT = "userapp-deployment"   // kubectl get deploy -n <ns>
         K8S_CONTAINER  = "userapp-container"    // container name inside that deployment
