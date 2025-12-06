@@ -4,15 +4,8 @@ FROM eclipse-temurin:21-jre-alpine
 # Set working directory inside the container
 WORKDIR /app
 
-# The JAR will be created by Jenkins with:
-# mvn -B clean package  -> target/<something>.jar
-ARG JAR_FILE=target/*.jar
-
 # Copy the built Spring Boot fat JAR into the container
-COPY ${JAR_FILE} app.jar
-
-# Optional: set Spring profile (adjust if you use profiles)
-# ENV SPRING_PROFILES_ACTIVE=prod
+COPY target/SpringBoot_DemoProject-0.0.1-SNAPSHOT.jar app.jar
 
 # Spring Boot default port
 EXPOSE 8081
